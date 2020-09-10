@@ -50,6 +50,8 @@ class TranslationFileLoaderTest extends TestCase
     {
         $loader = new FileLoader($files = m::mock(Filesystem::class), __DIR__);
         $files->shouldReceive('exists')->once()->with(__DIR__.'/en/foo.php')->andReturn(false);
+        $files->shouldReceive('exists')->once()->with(__DIR__.'/en/foo.json')->andReturn(false);
+
         $files->shouldReceive('getRequire')->never();
 
         $this->assertEquals([], $loader->load('en', 'foo', null));
@@ -83,5 +85,15 @@ class TranslationFileLoaderTest extends TestCase
         $files->shouldReceive('get')->once()->with(__DIR__.'/another/en.json')->andReturn('{"foo":"backagebar", "baz": "backagesplash"}');
 
         $this->assertEquals(['foo' => 'bar', 'baz' => 'backagesplash'], $loader->load('en', '*', '*'));
+    }
+
+    public function testLoadMethodForJSONInNormalPaths()
+    {
+        $loader = new FileLoader($files = m::mock(Filesystem::class), __DIR__);
+        $files->shouldReceive('exists')->once()->with(__DIR__.'/en/foo.php')->andReturn(false);
+        $files->shouldReceive('exists')->once()->with(__DIR__.'/en/foo.json')->andReturn(true);
+        $files->shouldReceive('get')->once()->with(__DIR__.'/en/foo.json')->andReturn('{"foo":"bar"}');
+
+        $this->assertEquals(['foo' => 'bar'], $loader->load('en', 'foo', null));
     }
 }

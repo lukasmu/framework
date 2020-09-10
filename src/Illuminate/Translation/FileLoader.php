@@ -123,6 +123,10 @@ class FileLoader implements Loader
             return $this->files->getRequire($full);
         }
 
+        if ($this->files->exists($full = "{$path}/{$locale}/{$group}.json")) {
+            return $this->decodeJson($full);
+        }
+
         return [];
     }
 
@@ -139,17 +143,29 @@ class FileLoader implements Loader
         return collect(array_merge($this->jsonPaths, [$this->path]))
             ->reduce(function ($output, $path) use ($locale) {
                 if ($this->files->exists($full = "{$path}/{$locale}.json")) {
-                    $decoded = json_decode($this->files->get($full), true);
-
-                    if (is_null($decoded) || json_last_error() !== JSON_ERROR_NONE) {
-                        throw new RuntimeException("Translation file [{$full}] contains an invalid JSON structure.");
-                    }
-
-                    $output = array_merge($output, $decoded);
+                    $output = array_merge($output, $this->decodeJson($full));
                 }
 
                 return $output;
             }, []);
+    }
+
+    /**
+     * Decode (and check) JSON from the given full file path.
+     *
+     * @param  string  $full
+     * @return array
+     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
+     */
+    protected function decodeJson(string $full)
+    {
+        $decoded = json_decode($this->files->get($full), true);
+
+        if (is_null($decoded) || json_last_error() !== JSON_ERROR_NONE) {
+            throw new RuntimeException("Translation file [{$full}] contains an invalid JSON structure.");
+        }
+
+        return $decoded;
     }
 
     /**
