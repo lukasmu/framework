@@ -147,18 +147,29 @@ class DatabaseQueue extends Queue implements QueueContract, ClearableQueue
     public function bulk($jobs, $data = '', $queue = null)
     {
         $queue = $this->getQueue($queue);
-
         $now = $this->availableAt();
 
-        return $this->database->table($this->table)->insert((new Collection((array) $jobs))->map(
+        $records = (new Collection((array) $jobs))->map(
             function ($job) use ($queue, $data, $now) {
-                return $this->buildDatabaseRecord(
-                    $queue,
-                    $this->createPayload($job, $this->getQueue($queue), $data),
-                    isset($job->delay) ? $this->availableAt($job->delay) : $now,
-                );
+                return [
+                    'job' => $job,
+                    'record' => $this->buildDatabaseRecord(
+                        $queue,
+                        $this->createPayload($job, $this->getQueue($queue), $data),
+                        isset($job->delay) ? $this->availableAt($job->delay) : $now,
+                    )
+                ];
             }
-        )->all());
+        );
+
+        $records->each(fn($record) => $this->raiseJobQueueingEvent($queue, $record['job'], $record['record']['payload'], $record['job']->delay ?? null));
+        
+        $result = $this->database->table($this->table)->insert($records->pluck('record')->all());
+        
+        $ids = $this->database->table($this->table)->whereIn('payload', $records->pluck('record')->pluck('payload'))->pluck('id', 'payload');
+        $records->each(fn($record) => $this->raiseJobQueuedEvent($queue, $ids[$record['record']['payload']], $record['job'], $record['record']['payload'], $record['job']->delay ?? null));
+
+        return $result;
     }
 
     /**
